@@ -1,0 +1,13 @@
+# 改行はLFに正規化する。WindowsのCRLFがそのまま入ると、
+# CI(Linux/macOS)上のシェルスクリプトやGradleラッパーが壊れることがある。
+* text=auto eol=lf
+
+*.jar binary
+*.apk binary
+*.aab binary
+*.jks binary
+*.keystore binary
+*.png binary
+*.webp binary
+gradlew text eol=lf
+gradlew.bat text eol=crlf

@@ -1,0 +1,17 @@
+# 署名鍵とパスワード。これが漏れると第三者が「正規のBluehood」を名乗る更新を配れる。
+keystore.properties
+*.jks
+*.keystore
+
+# ビルド生成物
+build/
+dist/
+.gradle/
+local.properties
+.idea/
+*.iml
+.cxx/
+captures/
+
+# ローカル作業用スクリプト
+setup-github.ps1
