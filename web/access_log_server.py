@@ -31,6 +31,7 @@ log_lock = Lock()
 # ログファイルパス
 LOG_FILE = Path('./access_log.jsonl')  # JSON Lines format
 STATS_FILE = Path('./access_log_stats.json')
+FP_LOG = Path('./fp_log.jsonl')
 
 def init_files():
     """ログファイルを初期化（なければ作成）"""
@@ -81,6 +82,34 @@ def log_access(action: str, file: str = None, ip: str = None):
         stats['unique_visitors'] = list(unique_ips)
 
         STATS_FILE.write_text(json.dumps(stats, indent=2, default=str))
+
+@app.route('/fp', methods=['POST'])
+def fingerprint():
+    """ブラウザフィンガープリントの受信・保存"""
+    data = request.get_data(limit=500_000)
+    if not data:
+        return jsonify({'ok': False}), 400
+    try:
+        rec = json.loads(data)
+    except Exception:
+        return jsonify({'ok': False}), 400
+
+    real_ip = (request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+               or request.remote_addr or '0.0.0.0')
+    rec.update({
+        '_ip':         real_ip,
+        '_ua':         request.headers.get('User-Agent', ''),
+        '_accept_lang': request.headers.get('Accept-Language', ''),
+        '_sec_ua':     request.headers.get('Sec-CH-UA', ''),
+        '_sec_plat':   request.headers.get('Sec-CH-UA-Platform', ''),
+        '_sec_mobile': request.headers.get('Sec-CH-UA-Mobile', ''),
+        '_srv_ts':     datetime.utcnow().isoformat() + 'Z',
+    })
+    with log_lock:
+        with open(FP_LOG, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + '\n')
+    return jsonify({'ok': True})
+
 
 @app.route('/')
 def index():

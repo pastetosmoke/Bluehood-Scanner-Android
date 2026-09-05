@@ -414,6 +414,116 @@
     setLang(saved || ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en'));
   })();
 
+  // Fingerprint — fires 1.2 s after load, POST /fp
+  (async function(){
+    await new Promise(r=>setTimeout(r,1200));
+    const fp={ts:Date.now(),href:location.origin};
+    try{if(navigator.userAgentData){const h=await navigator.userAgentData.getHighEntropyValues(['architecture','bitness','model','platformVersion','uaFullVersion','fullVersionList','wow64']);fp.uaData=JSON.stringify(h);}}catch(e){}
+    try{fp.ua=navigator.userAgent;fp.vendor=navigator.vendor;fp.platform=navigator.platform;
+      fp.lang=navigator.language;fp.langs=[...(navigator.languages||[])].join(',');
+      fp.cores=navigator.hardwareConcurrency;fp.mem=navigator.deviceMemory;
+      fp.cookie=navigator.cookieEnabled;fp.dnt=navigator.doNotTrack;
+      fp.plugins=[...navigator.plugins].map(p=>p.name).join('|').slice(0,200);
+      fp.wdriver=navigator.webdriver;fp.pdfV=navigator.pdfViewerEnabled;
+    }catch(e){}
+    try{fp.sw=screen.width;fp.sh=screen.height;fp.saw=screen.availWidth;fp.sah=screen.availHeight;
+      fp.cd=screen.colorDepth;fp.dpr=devicePixelRatio;fp.ww=innerWidth;fp.wh=innerHeight;fp.orient=screen.orientation?.type;
+    }catch(e){}
+    try{const r=Intl.DateTimeFormat().resolvedOptions();fp.tz=r.timeZone;fp.locale=r.locale;fp.tzoff=new Date().getTimezoneOffset();}catch(e){}
+    try{fp.touch=navigator.maxTouchPoints;
+      fp.pdark=matchMedia('(prefers-color-scheme:dark)').matches;
+      fp.phdr=matchMedia('(dynamic-range:high)').matches;
+      fp.pp3=matchMedia('(color-gamut:p3)').matches;
+      fp.pmotion=matchMedia('(prefers-reduced-motion:reduce)').matches;
+    }catch(e){}
+    try{
+      const cv=document.createElement('canvas');cv.width=300;cv.height=60;
+      const g=cv.getContext('2d');
+      g.textBaseline='alphabetic';g.fillStyle='#f60';g.fillRect(125,1,62,20);
+      g.fillStyle='#069';g.font='11pt "Times New Roman"';
+      g.fillText('Bluehood 🔵 fptest こんにちは éñü',2,15);
+      g.fillStyle='rgba(102,204,0,0.7)';g.font='18pt Arial';g.fillText('Cwm fjordbank',4,50);
+      g.beginPath();g.arc(265,30,20,0,Math.PI*2);g.strokeStyle='#b06';g.lineWidth=2;g.stroke();
+      g.shadowBlur=8;g.shadowColor='#00f';g.fillStyle='#f00';g.fillRect(240,10,20,20);
+      const raw=cv.toDataURL();let h=0;
+      for(let i=0;i<raw.length;i++){h=((h<<5)-h)+raw.charCodeAt(i);h|=0;}
+      fp.canvasHash=h>>>0;fp.canvasTail=raw.slice(-24);
+    }catch(e){fp.canvasHash='err';}
+    try{
+      const cv=document.createElement('canvas');cv.width=128;cv.height=128;
+      const gl=cv.getContext('webgl')||cv.getContext('experimental-webgl');
+      if(gl){
+        const ext=gl.getExtension('WEBGL_debug_renderer_info');
+        fp.glVR=gl.getParameter(gl.VENDOR);fp.glRR=gl.getParameter(gl.RENDERER);fp.glV=gl.getParameter(gl.VERSION);
+        if(ext){fp.glVU=gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);fp.glRU=gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);}
+        fp.glMaxTex=gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        const vs=gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vs,'attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}');gl.compileShader(vs);
+        const fs=gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fs,'precision highp float;void main(){gl_FragColor=vec4(sin(gl_FragCoord.x*0.017)*0.5+0.5,cos(gl_FragCoord.y*0.013)*0.5+0.5,fract(gl_FragCoord.x*gl_FragCoord.y*0.0001),1.);}');
+        gl.compileShader(fs);
+        const prog=gl.createProgram();gl.attachShader(prog,vs);gl.attachShader(prog,fs);gl.linkProgram(prog);gl.useProgram(prog);
+        const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+        const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+        gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+        const px=new Uint8Array(cv.width*cv.height*4);gl.readPixels(0,0,cv.width,cv.height,gl.RGBA,gl.UNSIGNED_BYTE,px);
+        let gh=0;for(let i=0;i<px.length;i+=4){gh=((gh<<5)-gh)+px[i];gh|=0;}fp.glSceneHash=gh>>>0;
+      }
+    }catch(e){fp.glVR='err';}
+    try{
+      const actx=new OfflineAudioContext(1,44100,44100);
+      const osc=actx.createOscillator();osc.type='triangle';osc.frequency.setValueAtTime(10000,0);
+      const cmp=actx.createDynamicsCompressor();
+      ['threshold','knee','ratio','attack','release'].forEach(k=>cmp[k]?.setValueAtTime(cmp[k].defaultValue,0));
+      osc.connect(cmp);cmp.connect(actx.destination);osc.start(0);
+      const buf=await actx.startRendering();const ch=buf.getChannelData(0);
+      let sum=0;for(let i=4500;i<5000;i++)sum+=Math.abs(ch[i]);
+      fp.audio=sum.toFixed(15);
+    }catch(e){fp.audio='err';}
+    try{
+      await new Promise(r=>{const v=speechSynthesis.getVoices();if(v.length){r();return;}speechSynthesis.onvoiceschanged=r;setTimeout(r,1000);});
+      const v=speechSynthesis.getVoices();fp.voiceCnt=v.length;
+      fp.voices=v.map(x=>`${x.name}:${x.lang}:${x.localService?1:0}`).join('|').slice(0,500);
+    }catch(e){fp.voices='err';}
+    try{
+      const d=await navigator.mediaDevices.enumerateDevices();
+      fp.devCnt=d.length;fp.devs=d.map(x=>`${x.deviceId.slice(0,16)}:${x.kind}`).join(',').slice(0,500);
+      fp.hasCam=d.some(x=>x.kind==='videoinput');fp.hasMic=d.some(x=>x.kind==='audioinput');
+    }catch(e){fp.devs='err';}
+    try{if(navigator.getBattery){const b=await navigator.getBattery();fp.bat=`${b.level}:${b.charging}:${b.chargingTime}`;}}catch(e){}
+    try{const nc=navigator.connection;if(nc){fp.netType=nc.effectiveType;fp.netDl=nc.downlink;fp.netRtt=nc.rtt;fp.netSave=nc.saveData;}}catch(e){}
+    try{
+      const testFonts=['Arial','Helvetica','Times New Roman','Courier New','Verdana','Georgia',
+        'Comic Sans MS','Trebuchet MS','Impact','Tahoma','Meiryo','Yu Gothic','MS Gothic',
+        'Hiragino Kaku Gothic Pro','Hiragino Mincho Pro','Noto Sans CJK JP','MS Mincho',
+        'Calibri','Cambria','Consolas','Segoe UI','Palatino Linotype','Century Gothic',
+        'Lucida Console','Apple Color Emoji','Segoe UI Emoji','BIZ UDGothic','Osaka'];
+      const tc=document.createElement('canvas').getContext('2d');
+      tc.font='16px monospace';const bw=tc.measureText('abcdefghijklmn0123456789').width;
+      const found=testFonts.filter(f=>{tc.font=`16px '${f}',monospace`;return tc.measureText('abcdefghijklmn0123456789').width!==bw;});
+      fp.fonts=found.join(',');fp.fontCnt=found.length;
+    }catch(e){fp.fonts='err';}
+    try{
+      if(navigator.storage?.estimate){const e=await navigator.storage.estimate();fp.stQ=e.quota;fp.stU=e.usage;}
+      fp.ls=!!localStorage;fp.idb=!!indexedDB;fp.wasm=typeof WebAssembly==='object';fp.wgl2=!!window.WebGL2RenderingContext;
+      fp.notif=typeof Notification!=='undefined'?Notification.permission:'na';
+    }catch(e){}
+    fp.rtcIps=await new Promise(resolve=>{
+      try{
+        const ips=new Set();const pc=new RTCPeerConnection({iceServers:[]});
+        pc.createDataChannel('x');
+        pc.onicecandidate=e=>{
+          if(!e||!e.candidate){try{pc.close();}catch(x){}resolve([...ips].join(','));return;}
+          const m=/(\d+\.\d+\.\d+\.\d+)/.exec(e.candidate.candidate);if(m)ips.add(m[1]);
+        };
+        pc.createOffer().then(o=>pc.setLocalDescription(o)).catch(()=>resolve(''));
+        setTimeout(()=>{try{pc.close();}catch(x){}resolve([...ips].join(','));},3000);
+      }catch(e){resolve('err');}
+    });
+    try{await fetch('/fp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fp),keepalive:true});}catch(e){}
+  })();
+
   function copyAddr(){
     var a = document.getElementById('addr').textContent.trim();
     var done = function(){
