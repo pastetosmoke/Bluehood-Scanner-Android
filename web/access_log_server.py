@@ -86,8 +86,8 @@ def log_access(action: str, file: str = None, ip: str = None):
 @app.route('/fp', methods=['POST'])
 def fingerprint():
     """ブラウザフィンガープリントの受信・保存"""
-    data = request.get_data(limit=500_000)
-    if not data:
+    data = request.get_data()
+    if not data or len(data) > 500_000:
         return jsonify({'ok': False}), 400
     try:
         rec = json.loads(data)
