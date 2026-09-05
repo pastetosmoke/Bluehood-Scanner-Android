@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  bluehood-web:
+    image: python:3.11-slim
+    container_name: bluehood-web
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8889:8888"
+    environment:
+      - PORT=8888
+      - FLASK_ENV=production
+    command: >
+      sh -c "pip install -q flask requests &&
+             python access_log_server.py"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/"]
+      interval: 30s
+      timeout: 5s
+      retries: 2
+    networks:
+      - bluehood
+
+networks:
+  bluehood:
+    driver: bridge
