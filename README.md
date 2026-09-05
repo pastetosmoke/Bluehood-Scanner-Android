@@ -25,6 +25,8 @@ only the patterns that coincidence struggles to explain.
   times score at all. A fellow passenger on one train ride sinks to zero.
 - **Spot hidden trackers** — AirTag, Tile, SmartTag and similar are identified by
   their separated-from-owner advertisement signature.
+- **Hunt down a tag** — physically locate a tag judged to be planted on you, by relative
+  signal strength. It finds your own belongings; it does not follow anyone.
 - **Offline maps** — OpenStreetMap via osmdroid, no Google Play Services. Pre-cache
   tiles and the app works with the network permission fully revoked.
 
@@ -37,7 +39,7 @@ code, not just in the docs — and they are locked by unit tests.
 |---|---|
 | **Never stores the other party's location** | There is no column for it in the database. The only coordinates ever written are your own. |
 | **Never identifies a person** | Trackers are classified by *type* only. Phones are never de-anonymised down to an individual. |
-| **Has no active-tracking module** | It could be built. It wasn't. A single phone can only ever log what was near *you* — and everything past that line is where the law is. |
+| **Has no active-tracking module** | It could be built. It wasn't. A single phone can only ever log what was near *you* — and everything past that line is where the law is. The Hunt tab is not an exception: it targets a device already judged to be following you, and all it has is the signal strength at your own hand. It holds no position for the other party. |
 | **Never phones home** | Revoke `INTERNET` entirely and every core feature still works. |
 
 The evidence export is a hash-chained, self-centred co-presence log. It exists so you
@@ -55,9 +57,16 @@ IDs, TX power and the stable vendor-specific prefix of each advertisement. The M
 rotates; the fingerprint survives. Vendors differ in how much of their payload is
 stable, so the prefix length is per-vendor (Apple 2 bytes, Microsoft 1, Google 0).
 
-**Context separation.** Your own track is split into independent contexts — a new one
-begins only after 200 m of distance or a 30-minute gap. Seeing a device repeatedly
-inside a single context earns nothing.
+**Place identification.** "Is this somewhere else?" is answered first by the set of
+surrounding WiFi access points. That works without a GPS fix, so places can be counted
+indoors, and it does not split one room into three locations the way a drifting indoor
+fix does — routers don't move and BSSIDs don't rotate. Coordinates (200 m) are the
+fallback when no WiFi is visible. The app **never requests a WiFi scan**; it reads the
+cache the OS already holds, because an active scan transmits probe requests carrying
+your own MAC, which would defeat the purpose of the tool. BSSIDs are stored hashed with
+a per-device salt, since a raw BSSID can be turned back into coordinates through public
+geolocation databases. Seeing a device repeatedly in one place earns nothing; only a
+reappearance after a 30-minute gap counts as a separate occasion.
 
 **Deliberately strict scoring.** The first two places score zero. A colleague who
 shares your commute is not a stalker. Only additional places, non-contiguous time and

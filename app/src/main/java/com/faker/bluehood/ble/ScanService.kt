@@ -24,6 +24,13 @@ import com.faker.bluehood.detect.TrackerType
 import kotlinx.coroutines.*
 
 /**
+ * 場所の指紋に採用するAPの下限RSSI。ESP32版の実測値に合わせる。
+ * -85 だと明滅する局が混ざり、その場に居るのに一致率が落ちて誤って場所が増えた
+ * (ESP32実機 2026-08-09)。強い局だけを使うほうが、少数でも安定する。
+ */
+private const val WIFI_RSSI_MIN = -78
+
+/**
  * 前景サービス。GrapheneOS の落とし穴に対処する:
  *  - 画面OFFでスキャンが止まる → 前景サービス常駐(通知必須) + 空ScanFilter
  *  - Bluetooth自動オフタイマー → 状態変化を購読し、復帰時に自動で再武装
@@ -196,6 +203,57 @@ class ScanService : Service() {
     private fun freshFix(): FloatArrayLoc? =
         lastFix?.takeIf { System.currentTimeMillis() - it.at < 5 * 60_000L }
 
+    // --- WiFi指紋(場所の同定) ---
+
+    @Volatile private var wifiFpCache: String? = null
+    @Volatile private var wifiFpAt = 0L
+    private val wifiSalt: ByteArray by lazy {
+        val sp = getSharedPreferences("bluehood", Context.MODE_PRIVATE)
+        val hex = sp.getString("wifi_salt", null) ?: run {
+            val b = ByteArray(16); java.security.SecureRandom().nextBytes(b)
+            val h = b.joinToString("") { "%02x".format(it) }
+            sp.edit().putString("wifi_salt", h).apply(); h
+        }
+        hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+    }
+
+    /**
+     * 周囲のAPの集合を場所の指紋にする。GPSが取れない屋内でも場所を数えられるのが要点。
+     *
+     * **startScan() は呼ばない。** アクティブスキャンはプローブ要求を送信し、そこに自分のMACが載る。
+     * 対監視の道具が自分の足跡を撒いていたら本末転倒なので、
+     * OSが自分の用途で既に集めたキャッシュ(scanResults)を読むだけにする。
+     * 副次的に Android 9以降のスキャン頻度制限とも無縁になる。
+     *
+     * BSSIDは生で保存しない。公開のジオロケーションDBで座標に復元できてしまうため、
+     * 端末固有ソルト付きのハッシュにする。集合の一致度計算はハッシュのままでも成立する。
+     */
+    private fun wifiFingerprint(): String? {
+        val now = System.currentTimeMillis()
+        wifiFpCache?.let { if (now - wifiFpAt < 30_000L) return it }
+        val wm = getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager ?: return null
+        val results = try { wm.scanResults } catch (e: SecurityException) { null } ?: return null
+        if (results.isEmpty()) return null
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val fp = results
+            .filter { it.level >= WIFI_RSSI_MIN }      // 弱い局は明滅して指紋を汚す
+            .mapNotNull { it.BSSID }
+            .distinct()
+            .map { bssid ->
+                md.reset(); md.update(wifiSalt)
+                md.digest(bssid.toByteArray()).take(6).joinToString("") { "%02x".format(it) }
+            }
+            .sorted()
+        wifiFpAt = now
+        wifiFpCache = if (fp.isEmpty()) null else fp.joinToString(",")
+        // 「取れていない」ことを隠さない。GrapheneOSでは権限やWiFiのOFFで
+        // scanResults が黙って空を返すことがあり、その場合 wifiFp は付かないまま
+        // 屋内判定が座標頼みに戻る(=以前の穴に落ちる)。件数を必ず残す。
+        android.util.Log.i("Bluehood", "wifiFp: scanResults=${results.size} 採用=${fp.size}")
+        ScanState.update { it.copy(wifiFpAps = fp.size) }
+        return wifiFpCache
+    }
+
     private val callback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             results++
@@ -213,6 +271,8 @@ class ScanService : Service() {
                 }
             }
             val fp = BleFingerprint.from(result, advIntervalMs = null)
+            // 探索は更新頻度が使い勝手を決めるので、handle() 側の10秒間引きより前に食わせる。
+            HuntState.record(result, fp)
             handle(fp, result, freshFix())     // 位置は付けられれば付ける。無くても近隣一覧には出す。
         }
         override fun onScanFailed(errorCode: Int) {
@@ -268,15 +328,18 @@ class ScanService : Service() {
                     clusterId = clusterId, timestamp = now, rssi = result.rssi,
                     mac = result.device?.address,
                     myLat = loc?.lat, myLon = loc?.lon, myAccuracyM = loc?.acc,
-                    rawPayloadHex = result.scanRecord?.bytes?.joinToString("") { "%02x".format(it) } ?: ""
+                    rawPayloadHex = result.scanRecord?.bytes?.joinToString("") { "%02x".format(it) } ?: "",
+                    wifiFp = wifiFingerprint()
                 )
             )
             savedTotal++
             if (loc != null) savedLocated++
 
             // トラッカーは窓またぎ追尾判定、通常デバイスは尾行スコア
+            // 自分の持ち物と申告された機器はスコアを再計算しない。
+            // 自分のイヤホン/IQOS等は定義上どこにでも付いてくるので、除外しないと必ず尾行判定に載る。
             if (tracker != null) recomputeTrackerFollow(tracker.label, clusterId)
-            else if (!fp.isLowEntropy) recomputeScore(clusterId)
+            else if (!fp.isLowEntropy && existing?.mine != true) recomputeScore(clusterId)
         }
     }
 
@@ -308,11 +371,10 @@ class ScanService : Service() {
     private suspend fun recomputeScore(clusterId: Long) {
         val dao = db.dao()
         val obs = dao.observationsFor(clusterId)
-        // 尾行判定は位置のある観測だけで行う(位置なしは近隣一覧には出るがスコアには寄与しない)
-        val located = obs.filter { it.myLat != null && it.myLon != null }
-        val myTrack = located.map { Triple(it.myLat!!, it.myLon!!, it.timestamp) }
-        val contexts = StalkerDetector.buildContexts(myTrack)
-        val score = StalkerDetector.score(located, contexts)
+        // 座標が無い観測も渡す。WiFi指紋があれば屋内でも場所として数えられる。
+        // 以前は座標のある観測だけを渡しており、GPSが取れない環境では
+        // 近隣一覧が埋まるのに判定は永久に0.0(=安全と誤認)になった。
+        val score = StalkerDetector.score(obs)
         val cluster = dao.findById(clusterId) ?: return
         if (score != cluster.stalkerScore) dao.updateCluster(cluster.copy(stalkerScore = score))
         if (score >= 5.0) alert("⚠ 尾行の可能性: 複数地点で同一デバイスを検知(score=$score)")

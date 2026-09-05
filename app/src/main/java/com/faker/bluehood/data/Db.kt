@@ -2,6 +2,7 @@ package com.faker.bluehood.data
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -22,6 +23,14 @@ data class DeviceCluster(
     val name: String? = null,         // 広告されたローカル名(あれば直接)
     val vendor: String? = null,       // 会社IDから推定したベンダー
     val deviceType: String? = null,   // サービスUUIDから推定した種別
+    /**
+     * ユーザーが「これは自分の持ち物」と申告した機器。
+     *
+     * 自分のイヤホンや時計は定義上あらゆる場所に付いてくるので、尾行スコアの条件
+     * (複数地点・非連続)を最も綺麗に満たしてしまう。除外できないと、本物の警告が
+     * 自分の機器のアラートに埋もれて意味を失う。
+     */
+    val mine: Boolean = false,
 )
 
 @Entity(
@@ -44,6 +53,17 @@ data class Observation(
     val myLon: Double?,
     val myAccuracyM: Float?,
     val rawPayloadHex: String,        // 生ペイロード(証拠の再検証用)
+    /**
+     * 観測時に見えていたWiFi APの集合(場所の指紋)。カンマ区切り。
+     *
+     * 生のBSSIDは保存しない。BSSIDは公開のジオロケーションDBで座標に変換できるため、
+     * そのまま持つと「持たなければ漏れない」という方針が崩れる。
+     * 端末固有ソルト付きのハッシュにしてあり、集合の一致度計算だけが成立する。
+     *
+     * GPSが取れない屋内でも場所を数えられるのが要点。従来 myLat が null の観測は
+     * スコア計算から丸ごと捨てられており、近隣一覧は埋まるのに判定は永久に0.0になった。
+     */
+    val wifiFp: String? = null,
 )
 
 @Dao
@@ -51,8 +71,12 @@ interface BluehoodDao {
     @Query("SELECT * FROM clusters ORDER BY lastSeen DESC")
     fun clusters(): Flow<List<DeviceCluster>>
 
-    @Query("SELECT * FROM clusters WHERE stalkerScore >= :threshold ORDER BY stalkerScore DESC")
+    // 自分の持ち物は除外する。除外しないと本物の警告が自分の機器に埋もれる。
+    @Query("SELECT * FROM clusters WHERE stalkerScore >= :threshold AND mine = 0 ORDER BY stalkerScore DESC")
     fun stalkerCandidates(threshold: Double): Flow<List<DeviceCluster>>
+
+    @Query("UPDATE clusters SET mine = :mine, stalkerScore = CASE WHEN :mine THEN 0.0 ELSE stalkerScore END WHERE id = :id")
+    suspend fun setMine(id: Long, mine: Boolean)
 
     // 匿名化トラッカー(種別判定できたもの)。滞留時間・スコアで追尾判定
     @Query("SELECT * FROM clusters WHERE trackerType IS NOT NULL ORDER BY stalkerScore DESC, lastSeen DESC")
@@ -91,19 +115,43 @@ interface BluehoodDao {
     @Insert suspend fun insertObservation(o: Observation)
 }
 
-@Database(entities = [DeviceCluster::class, Observation::class], version = 5, exportSchema = false)
+@Database(entities = [DeviceCluster::class, Observation::class], version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): BluehoodDao
 
     companion object {
+        /**
+         * v5 → v6: observations に wifiFp を1本足すだけ。
+         *
+         * ここまでのスキーマ変更は fallbackToDestructiveMigration に任せて作り直していたが、
+         * この版から観測ログは証拠として意味を持つので、黙って消してはいけない。
+         * 追加するのは null 許容の列1本なので、既存行はそのまま NULL で通る。
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE observations ADD COLUMN wifiFp TEXT")
+            }
+        }
+
         // ScanService と ViewModel で同一インスタンスを共有しないと、
         // 片方の書き込みがもう片方の Flow に伝播しない(InvalidationTrackerはインスタンス単位)。
+        /** v6 → v7: clusters に mine を1本足すだけ。既存行は全て「自分のものではない」で通る。 */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE clusters ADD COLUMN mine INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var INSTANCE: AppDatabase? = null
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "bluehood"
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+                    // 想定外のバージョン差で落ちるよりは作り直す。ただし定義済みの経路は
+                    // 上の addMigrations が先に食うので、v5→v6 でデータは消えない。
+                    .fallbackToDestructiveMigration()
+                    .build().also { INSTANCE = it }
             }
     }
 }

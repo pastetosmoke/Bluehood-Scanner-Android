@@ -1,8 +1,65 @@
-# Bluehood Scanner v0.1
+# Bluehood Scanner v0.2
 
-First public release. Android 13+ (API 33). Verified on GrapheneOS / Pixel 8 Pro.
+Android 13+ (API 33). Verified on GrapheneOS / Pixel 8 Pro.
 
-初回公開リリース。Android 13以降。GrapheneOS（Pixel 8 Pro）で動作確認。
+Android 13以降。GrapheneOS（Pixel 8 Pro）で動作確認。
+
+---
+
+## What's new in 0.2 / 0.2 の変更点
+
+**Follow detection now works indoors.** Until now the score was computed only from
+observations that carried GPS coordinates. Indoors, where no fix is available, the
+neighbourhood list filled up while the verdict stayed at 0.0 forever — the app looked
+safe because it was blind, and did not say so. Places are now identified by the set of
+surrounding WiFi access points, which works without GPS and does not drift the way an
+indoor fix does.
+
+**尾行判定が屋内でも動作します。** これまでスコアは座標のある観測だけで計算しており、
+測位できない屋内では近隣一覧が埋まるのに判定は永久に0.0のままでした。
+アプリは「見えていない」ことを告げずに安全に見えていたわけです。
+場所の同定を周囲のWiFi APの集合で行うようにしたため、GPS無しでも成立し、
+屋内測位の揺れで同じ場所が複数地点に割れることもなくなりました。
+
+The app never calls `startScan()` for WiFi — an active scan transmits probe requests
+carrying your own MAC, and a counter-surveillance tool that leaks your own trail defeats
+its purpose. It only reads the cache the OS has already collected. BSSIDs are never
+stored raw either: a public geolocation database can turn a BSSID back into coordinates,
+so they are hashed with a per-device salt. Set membership still compares correctly.
+
+WiFiの`startScan()`は呼びません。アクティブスキャンは自分のMACを載せたプローブ要求を
+送信するため、対監視の道具が自分の足跡を撒くことになるからです。OSが既に集めた
+キャッシュを読むだけです。BSSIDも生では保存しません。公開のジオロケーションDBで
+座標に復元できてしまうので、端末固有ソルト付きのハッシュにしています。
+
+**"That one's mine" marking.** Your own earbuds and watch follow you everywhere by
+definition, so they satisfy the follow criteria more cleanly than an actual stalker would.
+Left unfiltered, a real warning drowns in your own hardware. Only the owner can tell the
+difference, so it is a manual declaration: tap the chip on a device in the neighbourhood
+list and it is excluded from scoring.
+
+**「自分の機器」の申告。** 自分のイヤホンや時計は定義上どこにでも付いてくるので、
+本物の尾行より綺麗に尾行条件を満たしてしまいます。除外しないと本物の警告が
+自分の持ち物に埋もれます。持ち主にしか区別できないため申告制です。
+近隣一覧のチップをタップすると判定から除外されます。
+
+**Hunt tab.** Locates a tag that is already following you, by relative signal strength
+(hotter / colder). It does not track anyone: the only thing it has is the strength at
+your own hand, and nothing about the tab is written to storage. Turning RSSI into a
+distance in metres would be a lie — the environment dominates — so it shows relative
+strength and a direction of change only.
+
+**探索タブ。** 既に自分を追尾していると判定されたタグを、電波強度の相対変化
+（近い/遠い）で物理的に探します。相手を追う機能ではありません。得られるのは
+自分の手元での強度だけで、この画面の状態は一切保存されません。RSSIをメートルに
+換算するのは環境依存が大きすぎて嘘になるため、相対的な強さと変化の向きだけを表示します。
+
+**Your observation log now survives updates.** Earlier versions rebuilt the database on
+every schema change. From this release the log is evidence, so it is migrated rather than
+silently discarded.
+
+**観測ログが更新をまたいで残ります。** 以前はスキーマ変更のたびにDBを作り直していました。
+この版から観測ログは証拠として意味を持つため、黙って消さずマイグレーションします。
 
 ---
 
@@ -17,12 +74,12 @@ below are therefore the only way to tell a genuine build from a forgery — chec
 
 | | |
 |---|---|
-| File | `Bluehood-Scanner-0.1.apk` |
-| Size | 2,107,784 bytes (2.0 MB) |
-| APK SHA-256 | `68ac1a82f7a7326df0deaad62e274172f5a7b03d2605476343f1fbe168626082` |
+| File | `Bluehood-Scanner-0.2.apk` |
+| Size | 2,156,964 bytes (2.1 MB) |
+| APK SHA-256 | `885fefdf7b98d0b91a136c870730141aaa32aebe69e2c62ac5360c72845c9c73` |
 | Signing certificate SHA-256 | `797bf4fe07c8b352090b2914491149c6826870429831828d5aca1505c88d8092` |
 | Package | `com.faker.bluehood` |
-| versionCode / versionName | 1 / 0.1 |
+| versionCode / versionName | 2 / 0.2 |
 
 **The signing certificate hash is the value that matters across releases.** The APK
 hash changes with every build; the certificate hash must never change. If a future
@@ -36,11 +93,11 @@ install it, and open an issue.
 ### Checking the APK hash / APKハッシュの照合
 
 ```bash
-sha256sum Bluehood-Scanner-0.1.apk
+sha256sum Bluehood-Scanner-0.2.apk
 ```
 
 ```powershell
-Get-FileHash Bluehood-Scanner-0.1.apk -Algorithm SHA256
+Get-FileHash Bluehood-Scanner-0.2.apk -Algorithm SHA256
 ```
 
 ### Checking the signature / 署名の照合
@@ -48,7 +105,7 @@ Get-FileHash Bluehood-Scanner-0.1.apk -Algorithm SHA256
 With the Android SDK build-tools installed:
 
 ```bash
-apksigner verify --print-certs -v Bluehood-Scanner-0.1.apk
+apksigner verify --print-certs -v Bluehood-Scanner-0.2.apk
 ```
 
 Look for `Signer #1 certificate SHA-256 digest` and compare it with the table above.

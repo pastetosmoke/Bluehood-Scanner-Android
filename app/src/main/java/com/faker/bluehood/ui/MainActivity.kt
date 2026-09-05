@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.faker.bluehood.ble.ScanService
 import com.faker.bluehood.ble.ScanState
+import com.faker.bluehood.detect.PlaceFingerprint
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.cachemanager.CacheManager
 import org.osmdroid.tileprovider.tilesource.XYTileSource
@@ -74,7 +75,7 @@ class MainActivity : ComponentActivity() {
                     topBar = { ScanControlBar() },
                     bottomBar = {
                         NavigationBar {
-                            listOf("近隣" to 0, "尾行" to 1, "証拠" to 2, "地図" to 3, "情報" to 4)
+                            listOf("近隣" to 0, "尾行" to 1, "探索" to 2, "証拠" to 3, "地図" to 4, "情報" to 5)
                                 .forEach { (t, i) ->
                                     NavigationBarItem(
                                         selected = tab == i, onClick = { tab = i },
@@ -88,8 +89,9 @@ class MainActivity : ComponentActivity() {
                         when (tab) {
                             0 -> NeighborhoodScreen(vm)
                             1 -> StalkerScreen(vm)
-                            2 -> EvidenceScreen(vm)
-                            3 -> MapScreen(vm)
+                            2 -> HuntScreen(vm)
+                            3 -> EvidenceScreen(vm)
+                            4 -> MapScreen(vm)
                             else -> SupportScreen()
                         }
                     }
@@ -170,11 +172,21 @@ fun NeighborhoodScreen(vm: BluehoodViewModel) {
                 c.vendor?.let { if (c.name != null) append(it) }        // 名前があるときだけベンダーを併記
                 c.deviceType?.let { if (isNotEmpty()) append(" · "); append(it) }
                 if (c.untrackable && c.trackerType == null) { if (isNotEmpty()) append(" · "); append("匿名化") }
+                if (c.mine) { if (isNotEmpty()) append(" · "); append("自分の機器(判定から除外)") }
                 if (isEmpty()) append("score ${"%.1f".format(c.stalkerScore)}")
             }
             ListItem(
                 headlineContent = { Text(title) },
-                supportingContent = { Text(sub) }
+                supportingContent = { Text(sub) },
+                // 自分のイヤホン/IQOS等は全ての場所に付いてくるため、除外できないと
+                // 本物の警告がそれらに埋もれる。持ち主にしか分からないので申告制にする。
+                trailingContent = {
+                    FilterChip(
+                        selected = c.mine,
+                        onClick = { vm.setMine(c.id, !c.mine) },
+                        label = { Text(if (c.mine) "自分の" else "自分の?") }
+                    )
+                }
             )
             HorizontalDivider()
         }
@@ -194,10 +206,23 @@ fun StalkerScreen(vm: BluehoodViewModel) {
                 Text("スキャンが動作していないため、この画面の判定は最新ではありません。",
                     Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
             }
-        } else if (st.locatedRatio in 0f..0.01f) item {
+        } else if (st.locatedRatio in 0f..0.01f && st.wifiFpAps < PlaceFingerprint.MIN_APS) item {
+            // 座標もWiFi指紋も無いときだけ「判定できない」と言う。
+            // WiFi指紋があれば屋内でも場所は数えられるので、
+            // 動いているのに「動作していません」と表示するのは逆向きの嘘になる。
             Card(Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                Text("位置が取得できていないため、尾行判定は動作していません(屋外/窓際で測位してください)。",
+                Text("位置もWiFiの電波環境も取得できていないため、尾行判定は動作していません" +
+                    "(屋外/窓際で測位するか、WiFiをONにしてください)。",
+                    Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+            }
+        } else if (st.locatedRatio in 0f..0.01f) item {
+            // 判定は動くが、根拠がGPSではなく電波環境であることは隠さない。
+            Card(Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                Text("GPSは取得できていませんが、周囲のAP${st.wifiFpAps}局を場所の指紋として" +
+                    "尾行判定は動作しています(証拠には座標が付きません)。",
                     Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
             }
         }

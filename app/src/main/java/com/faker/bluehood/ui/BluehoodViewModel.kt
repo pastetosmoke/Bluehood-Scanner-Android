@@ -22,6 +22,11 @@ class BluehoodViewModel(app: Application) : AndroidViewModel(app) {
     private val _lastExport = MutableStateFlow<String?>(null)
     val lastExport: StateFlow<String?> = _lastExport
 
+    /** 自分の持ち物として申告/取り消し。申告時はスコアも0に戻す(過去の誤検知を残さない)。 */
+    fun setMine(id: Long, mine: Boolean) = viewModelScope.launch {
+        db.dao().setMine(id, mine)
+    }
+
     fun export(clusterId: Long) = viewModelScope.launch {
         val dao = db.dao()
         val cluster = dao.findById(clusterId) ?: return@launch

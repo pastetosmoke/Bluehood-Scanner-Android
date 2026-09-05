@@ -10,6 +10,8 @@
     <!-- osmdroid 地図タイル取得用 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 周囲のAPの集合を場所の指紋にする。スキャンは要求せずキャッシュを読むだけ(送信しない) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!-- 画面OFFでも尾行検知を続けるため前景サービス。位置も扱うので location を併記 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

@@ -26,6 +26,13 @@ object ScanState {
         val results: Long = 0,           // 起動以降に受信した広告数(生存の証拠)
         val lastResultAt: Long = 0,      // 最後に結果が来た時刻(0=まだ無い)
         val locatedRatio: Float = -1f,   // 直近観測のうち位置が付いた割合(-1=未計測)
+        /**
+         * 場所の指紋に採用できたAP数(-1=まだ試していない)。
+         *
+         * GPSが無くてもこれが3以上あれば尾行判定は動く。
+         * 「位置が取れない=判定できない」と表示するのは、この値が足りないときだけ。
+         */
+        val wifiFpAps: Int = -1,
     )
 
     private val _state = MutableStateFlow(State())

@@ -23,8 +23,8 @@ android {
         applicationId = "com.faker.bluehood"
         minSdk = 33            // ScanRecord.getBytes() がAPI33。GrapheneOS/Pixel8Proは34+なので実害なし
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
     }
     signingConfigs {
         if (hasReleaseKey) {

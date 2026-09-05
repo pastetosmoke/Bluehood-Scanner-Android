@@ -97,9 +97,7 @@ class StationaryFalsePositiveTest {
     @Test
     fun stalkerScoreIsZeroWhenStationary() {
         val list = (0..30).map { obs(homeLat, homeLon, it * 60L) }   // 30時間その場に居る
-        val track = list.map { Triple(it.myLat!!, it.myLon!!, it.timestamp) }
-        val contexts = StalkerDetector.buildContexts(track)
-        assertEquals(0.0, StalkerDetector.score(list, contexts), 0.001)
+        assertEquals(0.0, StalkerDetector.score(list), 0.001)
     }
 }
 
