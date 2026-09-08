@@ -19,7 +19,10 @@ import org.junit.Test
  */
 class StationaryFalsePositiveTest {
 
-    /** 実機で記録された実際の座標範囲(103m四方)。 */
+    /**
+     * 実機で記録された誤検知時の座標間隔(103m四方)を、大宮駅を原点に平行移動したもの。
+     * 判定は距離ベースなので絶対位置には依存しない。実座標は投稿者の居所そのものなので使わない。
+     */
     private val homeLat = 35.906110
     private val homeLon = 139.623610
     private val awayLat = 35.906727      // 約68m北
@@ -84,7 +87,7 @@ class StationaryFalsePositiveTest {
     /** 地点数は距離で数える。geohashのセル数で数えると同じ場所が複数地点になる。 */
     @Test
     fun distinctPlacesUsesDistanceNotGeohashCells() {
-        // 実機で3つのgeohash-7セルに割れた実座標
+        // 実機で3つのgeohash-7セルに割れた間隔を、大宮駅を原点に平行移動したもの
         val sameArea = listOf(
             35.906110 to 139.623610,
             35.906727 to 139.624456,

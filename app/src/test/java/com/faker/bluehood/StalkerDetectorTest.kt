@@ -82,7 +82,8 @@ class StalkerDetectorTest {
 
     @Test
     fun `GPSが揺れても同じWiFi指紋なら1地点として畳まれる`() {
-        // 実機で3つのgeohash-7セルに割れた実座標。屋内GPSの揺れであって移動ではない。
+        // 実機で3つのgeohash-7セルに割れた間隔を、大宮駅を原点に平行移動したもの。
+        // 屋内GPSの揺れであって移動ではない。
         val jitter = listOf(
             35.906110 to 139.623610,
             35.906727 to 139.624456,

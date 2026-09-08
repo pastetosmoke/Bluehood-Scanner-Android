@@ -60,7 +60,7 @@ python access_log_server.py --port 8888
 # → ブラウザで http://<KALI_HOST>:8888 にアクセス
 ```
 
-### 3. Docker化（推奨：<other-service> と同じ構成）
+### 3. Docker化（推奨：別サービス と同じ構成）
 
 Kali機の `<HOME>/<other-service>/` と同じように Docker で管理：
 
@@ -94,7 +94,7 @@ docker-compose logs -f  # ログ確認
 
 Kali機の既存 cloudflared 設定に Bluehood ルートを追加：
 
-**~/.cloudflared/config.yml** (既存のreadsb/<other-service>に追加)：
+**~/.cloudflared/config.yml** (既存の他サービス設定に追加)：
 
 ```yaml
 tunnel: <tunnel-uuid>
