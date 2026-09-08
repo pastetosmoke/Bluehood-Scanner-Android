@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
                     topBar = { ScanControlBar() },
                     bottomBar = {
                         NavigationBar {
-                            listOf("近隣" to 0, "尾行" to 1, "探索" to 2, "証拠" to 3, "地図" to 4, "情報" to 5)
+                            listOf("近隣" to 0, "尾行" to 1, "探索" to 2, "証拠" to 3, "地図" to 4, "攻撃" to 5, "情報" to 6)
                                 .forEach { (t, i) ->
                                     NavigationBarItem(
                                         selected = tab == i, onClick = { tab = i },
@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
                             2 -> HuntScreen(vm)
                             3 -> EvidenceScreen(vm)
                             4 -> MapScreen(vm)
+                            5 -> AttackScreen(vm)
                             else -> SupportScreen()
                         }
                     }

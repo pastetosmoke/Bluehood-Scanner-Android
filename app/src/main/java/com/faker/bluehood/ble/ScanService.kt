@@ -16,6 +16,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.faker.bluehood.data.*
+import com.faker.bluehood.detect.AttackDetector
 import com.faker.bluehood.detect.DeviceNamer
 import com.faker.bluehood.detect.StalkerDetector
 import com.faker.bluehood.detect.TrackerClassifier
@@ -273,6 +274,9 @@ class ScanService : Service() {
             val fp = BleFingerprint.from(result, advIntervalMs = null)
             // 探索は更新頻度が使い勝手を決めるので、handle() 側の10秒間引きより前に食わせる。
             HuntState.record(result, fp)
+            // 攻撃シグネチャ検出は10秒間引きの前に毎件評価する(フラッディング検知には生頻度が必要)。
+            val attacks = AttackDetector.analyze(fp, result)
+            if (attacks.isNotEmpty()) scope.launch { saveAttacks(attacks, result) }
             handle(fp, result, freshFix())     // 位置は付けられれば付ける。無くても近隣一覧には出す。
         }
         override fun onScanFailed(errorCode: Int) {
@@ -340,6 +344,25 @@ class ScanService : Service() {
             // 自分のイヤホン/IQOS等は定義上どこにでも付いてくるので、除外しないと必ず尾行判定に載る。
             if (tracker != null) recomputeTrackerFollow(tracker.label, clusterId)
             else if (!fp.isLowEntropy && existing?.mine != true) recomputeScore(clusterId)
+        }
+    }
+
+    private suspend fun saveAttacks(findings: List<AttackDetector.Finding>, result: ScanResult) {
+        val dao = db.dao()
+        val now = System.currentTimeMillis()
+        for (f in findings) {
+            dao.insertAttackEvent(
+                AttackEvent(
+                    timestamp = now,
+                    signatureId = f.sig.name,
+                    title = f.sig.title,
+                    cve = f.sig.cve,
+                    mac = result.device?.address,
+                    rssi = result.rssi,
+                    evidence = f.evidence,
+                )
+            )
+            alert("⚠ 攻撃シグネチャ検出: ${f.sig.title}")
         }
     }
 

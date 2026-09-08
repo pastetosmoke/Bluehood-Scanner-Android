@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.*
 import androidx.room.migration.Migration
 import kotlinx.coroutines.flow.Flow
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * 「デバイス(安定キー)」と「観測イベント」を分離する。
@@ -66,6 +67,19 @@ data class Observation(
     val wifiFp: String? = null,
 )
 
+@Entity(tableName = "attack_events")
+data class AttackEvent(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val timestamp: Long,
+    val signatureId: String,
+    val title: String,
+    val cve: String?,
+    val mac: String?,
+    val rssi: Int,
+    val evidence: String,
+    val isTest: Boolean = false,
+)
+
 @Dao
 interface BluehoodDao {
     @Query("SELECT * FROM clusters ORDER BY lastSeen DESC")
@@ -113,9 +127,14 @@ interface BluehoodDao {
     @Query("UPDATE clusters SET stalkerScore = :score WHERE trackerType = :type")
     suspend fun updateTrackerScores(type: String, score: Double)
     @Insert suspend fun insertObservation(o: Observation)
+
+    @Query("SELECT * FROM attack_events ORDER BY timestamp DESC LIMIT 300")
+    fun attackEvents(): Flow<List<AttackEvent>>
+
+    @Insert suspend fun insertAttackEvent(e: AttackEvent)
 }
 
-@Database(entities = [DeviceCluster::class, Observation::class], version = 7, exportSchema = false)
+@Database(entities = [DeviceCluster::class, Observation::class, AttackEvent::class], version = 8, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): BluehoodDao
 
@@ -142,14 +161,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE attack_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        signatureId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        cve TEXT,
+                        mac TEXT,
+                        rssi INTEGER NOT NULL,
+                        evidence TEXT NOT NULL,
+                        isTest INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+            }
+        }
+
         @Volatile private var INSTANCE: AppDatabase? = null
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext, AppDatabase::class.java, "bluehood"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7)
-                    // 想定外のバージョン差で落ちるよりは作り直す。ただし定義済みの経路は
-                    // 上の addMigrations が先に食うので、v5→v6 でデータは消えない。
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigration()
                     .build().also { INSTANCE = it }
             }
