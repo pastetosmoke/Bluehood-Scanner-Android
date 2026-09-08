@@ -32,9 +32,10 @@ import kotlinx.coroutines.*
 private const val WIFI_RSSI_MIN = -78
 
 /**
- * 前景サービス。GrapheneOS の落とし穴に対処する:
+ * 前景サービス。Android 側の落とし穴に対処する:
  *  - 画面OFFでスキャンが止まる → 前景サービス常駐(通知必須) + 空ScanFilter
- *  - Bluetooth自動オフタイマー → 状態変化を購読し、復帰時に自動で再武装
+ *  - 外部要因でのBluetooth OFF(ユーザー操作・機内モード・OSの自動オフタイマー)
+ *    → 状態変化を購読し、復帰時に自動で再武装
  *  - 30秒に5回の startScan 制限(AOSP) → 多重起動をフラグで抑止
  *
  * 設計方針: 「スキャンできていない」ことを絶対に隠さない。
@@ -247,7 +248,7 @@ class ScanService : Service() {
             .sorted()
         wifiFpAt = now
         wifiFpCache = if (fp.isEmpty()) null else fp.joinToString(",")
-        // 「取れていない」ことを隠さない。GrapheneOSでは権限やWiFiのOFFで
+        // 「取れていない」ことを隠さない。権限やWiFiのOFF、スキャンのスロットリングで
         // scanResults が黙って空を返すことがあり、その場合 wifiFp は付かないまま
         // 屋内判定が座標頼みに戻る(=以前の穴に落ちる)。件数を必ず残す。
         android.util.Log.i("Bluehood", "wifiFp: scanResults=${results.size} 採用=${fp.size}")

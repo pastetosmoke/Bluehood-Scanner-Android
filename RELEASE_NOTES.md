@@ -1,8 +1,8 @@
 # Bluehood Scanner v0.2
 
-Android 13+ (API 33). Verified on GrapheneOS / Pixel 8 Pro.
+Android 13+ (API 33), stock Android. No Google Play Services required.
 
-Android 13以降。GrapheneOS（Pixel 8 Pro）で動作確認。
+Android 13以降、素のAndroidで動作します。Google Play Servicesは不要です。
 
 ---
 
@@ -139,16 +139,19 @@ missing rather than pretending to work.
    scan results from apps holding only coarse location.
    位置情報の権限は**正確な位置**。「おおよそ」ではスキャン結果が渡されません。
 
-`INTERNET` is **not** required. Every core feature — scanning, fingerprinting, follow
-detection, evidence export — works with the network permission fully revoked. On
-GrapheneOS you can revoke it right away; only online map tiles will be unavailable.
-To keep the map too, open it online once and use **Save this area** to pre-cache
-tiles, then revoke.
+`INTERNET` is used **only** for map tiles. Scanning, fingerprinting, follow detection
+and evidence export all work with no network whatsoever. Stock Android grants
+`INTERNET` at install time and offers no way to take it back, so if you want that
+enforced by something other than trust, deny the app with a local-VPN firewall such as
+NetGuard or RethinkDNS, or keep the device offline. Either way, open the map online
+once first and use **Save this area** to pre-cache tiles.
 
-`INTERNET` 権限は**不要**です。スキャン・指紋・尾行検知・証拠出力といった中核機能は
-権限を完全に剥奪しても動作します。GrapheneOSでは最初から剥奪して構いません
-（地図タイルだけが出なくなります）。地図も使いたい場合は、一度オンラインで開いて
-**「この範囲を保存」**でタイルをキャッシュしてから剥奪してください。
+`INTERNET` 権限は**地図タイルの取得にしか使いません**。スキャン・指紋・尾行検知・証拠出力は
+ネットワークが一切なくても動作します。素のAndroidでは `INTERNET` はインストール時に付与され、
+後から剥奪する手段がありません。信頼以外の方法で担保したい場合は、NetGuard や RethinkDNS などの
+ローカルVPN型ファイアウォールでこのアプリを遮断するか、端末をオフラインで使ってください。
+いずれの場合も、先に一度オンラインで地図を開き**「この範囲を保存」**でタイルを
+キャッシュしておいてください。
 
 ---
 
@@ -169,8 +172,11 @@ tiles, then revoke.
 - The selected tab resets when the Activity is recreated (e.g. on rotation).
   Activity再生成（画面回転など）でタブ選択が戻ります。
 
-On GrapheneOS specifically: exempt the app from battery optimisation, and be aware
-that Android throttles `startScan` to 5 calls per 30 seconds.
+On any Android: exempt the app from battery optimisation. Vendor ROMs (Samsung,
+Xiaomi, OPPO and others) stop background services far more aggressively than AOSP, and
+a stopped foreground service means no scanning. Android also throttles `startScan` to
+5 calls per 30 seconds.
 
-GrapheneOS特有の注意: バッテリー最適化から除外してください。また Android は
-`startScan` を30秒に5回までに制限します。
+端末を問わない注意: バッテリー最適化から除外してください。メーカー製ROM（Samsung・Xiaomi・
+OPPOなど）はAOSPよりも積極的にバックグラウンドを停止し、前景サービスが止まればスキャンも
+止まります。また Android は `startScan` を30秒に5回までに制限します。

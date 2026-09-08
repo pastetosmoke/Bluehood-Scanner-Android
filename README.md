@@ -28,7 +28,8 @@ only the patterns that coincidence struggles to explain.
 - **Hunt down a tag** — physically locate a tag judged to be planted on you, by relative
   signal strength. It finds your own belongings; it does not follow anyone.
 - **Offline maps** — OpenStreetMap via osmdroid, no Google Play Services. Pre-cache
-  tiles and the app works with the network permission fully revoked.
+  tiles and the app works with no network at all — airplane mode, or blocked by a
+  firewall.
 
 ## What it refuses to do
 
@@ -40,7 +41,7 @@ code, not just in the docs — and they are locked by unit tests.
 | **Never stores the other party's location** | There is no column for it in the database. The only coordinates ever written are your own. |
 | **Never identifies a person** | Trackers are classified by *type* only. Phones are never de-anonymised down to an individual. |
 | **Has no active-tracking module** | It could be built. It wasn't. A single phone can only ever log what was near *you* — and everything past that line is where the law is. The Hunt tab is not an exception: it targets a device already judged to be following you, and all it has is the signal strength at your own hand. It holds no position for the other party. |
-| **Never phones home** | Revoke `INTERNET` entirely and every core feature still works. |
+| **Never phones home** | `INTERNET` is used for map tiles and nothing else. Cut the app off from the network entirely — airplane mode, or a local-VPN firewall — and every core feature still works. |
 
 The evidence export is a hash-chained, self-centred co-presence log. It exists so you
 can hand it to the police — not so you can run your own investigation. Pursuing or
@@ -128,7 +129,13 @@ The APK hash changes with every build. The signing certificate must not:
 If a release shows a different certificate, it did not come from this project. Do not
 install it, and open an issue.
 
-Requires **Android 13+**. Verified on GrapheneOS (Pixel 8 Pro).
+Requires **Android 13+** and Bluetooth LE. Stock Android is the target: the app uses
+no Google Play Services and no ROM- or vendor-specific API, so it does not need a
+hardened OS. Development builds are tested on a Pixel.
+
+If your vendor ROM stops background services aggressively — Samsung, Xiaomi and OPPO
+all do — exempt Bluehood from battery optimisation. A stopped foreground service means
+no scanning at all.
 
 After installing, three things must be enabled or the app will tell you it cannot
 scan: Bluetooth, location services (the system-wide toggle), and precise location
